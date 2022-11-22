@@ -1,0 +1,56 @@
+name: "codeartifact-login-yarn"
+description: "Get codeartifact token and setup yarn to use it"
+
+inputs:
+  scope:
+    description: "Define token in local or global configuration (default: local)"
+    required: false
+    default: "local"
+  arn:
+    description: "Codeartifact arn"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Decompose and check ARN
+      id: arn-check
+      shell: bash
+      run: |
+        IFS=':' ARN=(${{inputs.arn}})
+        IFS='/' REPO=(${ARN[5]})
+
+        SERVICE=${ARN[2]}
+        RESOURCE=${REPO[0]}
+
+        if [ "$SERVICE" != 'codeartifact' ]; then
+          echo "This ARN do not refer to codeartifact"
+          exit 1
+        fi
+
+        if [ "$RESOURCE" != 'repository' ]; then
+          echo "This ARN do not refer to a repository"
+          exit 1
+        fi
+
+        REGION=${ARN[3]}
+        OWNER=${ARN[4]}
+        DOMAIN=${REPO[1]}
+        REGISTRY=${REPO[2]}
+
+        echo "REGION=$REGION" >> $GITHUB_ENV
+        echo "OWNER=$OWNER" >> $GITHUB_ENV
+        echo "DOMAIN=$DOMAIN" >> $GITHUB_ENV
+        echo "REGISTRY=$REGISTRY" >> $GITHUB_ENV
+
+    - name: Get codeartifact token
+      id: token
+      shell: bash
+      run: |
+        TOKEN=$(aws codeartifact get-authorization-token \
+          --domain ${DOMAIN} \
+          --domain-owner ${OWNER} \
+          --region ${REGION}
+          --query authorizationToken \
+          --output text \
+          )
