@@ -10,6 +10,11 @@ inputs:
     description: "Codeartifact arn"
     required: true
 
+outputs:
+  token:
+    description: "The codeartifact token"
+    value: ${{steps.token.outputs.token}}
+
 runs:
   using: composite
   steps:
@@ -17,8 +22,8 @@ runs:
       id: arn-check
       shell: bash
       run: |
-        IFS=':' ARN=(${{inputs.arn}})
-        IFS='/' REPO=(${ARN[5]})
+        ARN=($(echo "${{inputs.arn}}" | tr ':' ' '))
+        REPO=($(echo "${ARN[5]}" | tr '/' ' '))
 
         SERVICE=${ARN[2]}
         RESOURCE=${REPO[0]}
@@ -50,7 +55,22 @@ runs:
         TOKEN=$(aws codeartifact get-authorization-token \
           --domain ${DOMAIN} \
           --domain-owner ${OWNER} \
-          --region ${REGION}
+          --region ${REGION} \
           --query authorizationToken \
           --output text \
           )
+          
+        echo "::add-mask::$TOKEN"
+        echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+    - name: Config yarn
+      shell: bash
+      run: |
+        URL=https://${DOMAIN}-${OWNER}.d.codeartifact.${REGION}.amazonaws.com/npm/${REGISTRY}/
+
+        if [ "${{inputs.scope}}" == 'global' ]; then
+          SCOPE='-H'
+        fi
+
+        yarn config set ${SCOPE} "npmRegistries['${URL}'].npmAuthToken" "${{steps.token.outputs.token}}"
+        yarn config set ${SCOPE} "npmRegistries['${URL}'].npmAlwaysAuth" "true"
