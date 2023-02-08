@@ -69,7 +69,7 @@ runs:
 
     - name: Config yarn
       shell: bash
-      working-directory: ${{inputs.working-directory}}
+      working-directory: ${{inputs.working-dir}}
       run: |
         URL=https://${DOMAIN}-${OWNER}.d.codeartifact.${REGION}.amazonaws.com/npm/${REGISTRY}/
 
